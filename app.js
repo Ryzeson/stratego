@@ -25,6 +25,8 @@ const gamePieces = [
 const PLAYER_ZERO = 0;
 const PLAYER_ONE = 1;
 
+const DEBUG = true;
+
 const PLAYER_COLOR = "#186E7E";
 const PLAYER_HOVER = "#155B68";
 const PLAYER_CLICK = "#49D7F2";
@@ -78,6 +80,14 @@ function drawBoard(x, y) {
     drawCell(5,7);
 }
 
+function updateBoard() {
+    for (var r = 0; r < ROWS; r++) {
+        for (var c = 0; c < COLS; c++) {
+            drawCell(r, c, grid[r][c]);
+        }
+    }
+}
+
 function drawCell(r, c, s = "", color=WATER_COLOR) {
     ctx.beginPath();
     ctx.rect(c*CELL_WIDTH + X_OFFSET, r*CELL_HEIGHT + Y_OFFSET, CELL_WIDTH, CELL_HEIGHT);
@@ -121,13 +131,74 @@ function isSelectedCell(r, c) {
     return false;
 }
 
-function isValidMove(r,c) {
+function move(fromR, fromC, r, c, p) {
+    let color;
+    if (p == PLAYER_ZERO)
+        color = PLAYER_COLOR;
+    else
+        color = OPPONENT_COLOR;
+    if (playerGrid[r][c] == 1 - p) {
+        if(grid[r][c] == '💣') {
+            if (+grid[fromR][fromC] == 3) {
+                if (p == PLAYER_ZERO || (p == PLAYER_ONE && DEBUG))
+                    drawCell(r, c, grid[fromR][fromC], color);
+                else
+                    drawCell(r, c, "", color);
+                grid[r][c] = grid[fromR][fromC];
+                playerGrid[r][c] = p;
+            }
+                drawCell(fromR, fromC, "", GRASS_COLOR);
+                grid[fromR][fromC] = 0;
+                playerGrid[fromR][fromC] = 2;
+        }
+        else if(grid[r][c] == '🚩') {
+            if (p == PLAYER_ZERO)
+                alert("You win! :)");
+            else
+                alert("You lose :(")
+        }
+        else {
+            if (+grid[r][c] < +grid[fromR][fromC] ||
+                (+grid[r][c] == 10 && +grid[fromR][fromC] == 1)) {
+                if (p == PLAYER_ZERO || (p == PLAYER_ONE && DEBUG))
+                    drawCell(r, c, grid[fromR][fromC], color);
+                else
+                    drawCell(r, c, "", color);
+                grid[r][c] = grid[fromR][fromC];
+                playerGrid[r][c] = p;
+            }
+            else if (+grid[r][c] == +grid[fromR][fromC]) {
+                drawCell(r, c, "", GRASS_COLOR);
+                grid[r][c] = 0;
+                playerGrid[r][c] = 2;
+            }
+            drawCell(fromR, fromC, "", GRASS_COLOR);
+            grid[fromR][fromC] = 0;
+            playerGrid[fromR][fromC] = 2;
+        }
+    }
+    else {
+        if (p == PLAYER_ZERO || (p == PLAYER_ONE && DEBUG))
+            drawCell(r, c, grid[fromR][fromC], color);
+        else
+            drawCell(r, c, "", color);
+        drawCell(fromR, fromC, "", GRASS_COLOR);
+        
+        grid[r][c] = grid[fromR][fromC];
+        grid[fromR][fromC] = 0;
+        playerGrid[r][c] = p;
+        playerGrid[fromR][fromC] = 2;
+    }
+    selectedCell[0] = selectedCell[1] = null;
+}
+
+function isValidMove(r, c, p) {
     if (selectedCell[0] == null) {
         return false;
     }
     // scout movement rules
     if (+grid[selectedCell[0]][selectedCell[1]] == 2) {
-        if (r == selectedCell[0] && (grid[r][c] == 0 || playerGrid[r][c] == 1)) {
+        if (r == selectedCell[0] && (grid[r][c] == 0 || playerGrid[r][c] == 1 - p)) {
             if (c < selectedCell[1]) {
                 for (var col = c + 1; col < selectedCell[1]; col++) {
                     if (grid[r][col] != 0)
@@ -142,7 +213,7 @@ function isValidMove(r,c) {
             }
             return true;
         }
-        else if (c == selectedCell[1] && (grid[r][c] == 0 || playerGrid[r][c] == 1)) {
+        else if (c == selectedCell[1] && (grid[r][c] == 0 || playerGrid[r][c] == 1 - p)) {
             if (r < selectedCell[0]) {
                 for (var row = r + 1; row < selectedCell[0]; row++) {
                     if (grid[row][c] != 0)
@@ -166,52 +237,80 @@ function isValidMove(r,c) {
         (r == selectedCell[0] - 1 && c == selectedCell[1]) ||
         (r == selectedCell[0] && c == selectedCell[1] + 1) ||
         (r == selectedCell[0] && c == selectedCell[1] - 1)) &&
-        (grid[r][c] == 0 || playerGrid[r][c] == 1))
+        (grid[r][c] == 0 || playerGrid[r][c] == 1 - p))
         return true;
     return false;
 }
 
-function showValidMoves() {
+function getValidMoves(p) {
     for (var r = 0; r < ROWS; r ++) {
         for (var c = 0; c < COLS; c++) {
-            if (isValidMove(r, c))
+            if (isValidMove(r, c, p))
                 validMoves.push([r,c]);
         }
     }
+}
+
+function showValidMoves(p) {
     for (var move of validMoves) {
         if (playerGrid[move[0]][move[1]] == 2)
             drawCell(move[0], move[1], "", GRASS_HIGHLIGHT);
         else
-            drawCell(move[0], move[1], grid[move[0]][move[1]], OPPONENT_HIGHLIGHT);
+            if (DEBUG)
+                drawCell(move[0], move[1], grid[move[0]][move[1]], OPPONENT_HIGHLIGHT);
+            else
+                drawCell(move[0], move[1], "", OPPONENT_HIGHLIGHT);
     }
-    return validMoves;
 }
 
-function clearValidMoves() {
+function unShowValidMoves(p) {
     for (var move of validMoves) {
         if (playerGrid[move[0]][move[1]] == 2)
             drawCell(move[0], move[1], "", GRASS_COLOR);
         else
-            drawCell(move[0], move[1], grid[move[0]][move[1]], OPPONENT_COLOR);
+            if (DEBUG)
+                drawCell(move[0], move[1], grid[move[0]][move[1]], OPPONENT_COLOR);
+            else
+                drawCell(move[0], move[1], "", OPPONENT_COLOR);
     }
     validMoves.length = 0;
 }
 
 function opponentMakeMove() {
+    var moveList = [];
     for (var r = 0; r < ROWS; r++) {
         for (var c = 0; c < COLS; c++) {
-            if(isPlayerCell(r, c, PLAYER_ONE) && isMoveablePiece(r,c))
-                continue;
+            selectedCell = [r,c]
+            if(isPlayerCell(r, c, PLAYER_ONE) && isMoveablePiece(r,c)) {
+                getValidMoves(PLAYER_ONE);
+                if (validMoves.length != 0) {
+                    for (var m in validMoves)
+                        moveList.push([r, c, validMoves[m][0], validMoves[m][1]])
+                }
+                validMoves.length = 0;
+            }
         }
     }
 
-    console.log("Click ready :)");
+    if (moveList.length == 0) {
+        alert("You win!")
+    }
+    else {
+        let moveCoords = moveList[Math.floor(Math.random() * moveList.length)];
+        move(moveCoords[0], moveCoords[1], moveCoords[2], moveCoords[3], PLAYER_ONE);
+    }
+    
+    if ()
+
+    // console.log("Your move");
     $("canvas").on("click", handleClick);
+    $("canvas").on("mousemove", handleMouseMove);
 }
 
 function opponentMove() {
     $("canvas").off("click", handleClick);
-    setTimeout(opponentMakeMove, 5);
+    $("canvas").off("mousemove", handleMouseMove);
+    setTimeout(opponentMakeMove, 1000);
 }
 
 
@@ -228,10 +327,10 @@ function randomizeSetup(p) {
     for (var r = rStart; r < rEnd; r ++) {
         for (var c = 0; c < COLS; c++) {
             let i = Math.floor(Math.random() * pieces.length);
-            // if (p == PLAYER_ZERO)
+            if (p == PLAYER_ZERO || DEBUG)
                 drawCell(r, c, pieces[i], color);
-            // else 
-            //     drawCell(r, c, "", color);
+            else 
+                drawCell(r, c, "", color);
             grid[r][c] = pieces[i];
             pieces.splice(i, 1);
         }
@@ -266,7 +365,7 @@ function initGrid() {
 }
 
 function handleClick(e) {
-    clearValidMoves();
+    unShowValidMoves(PLAYER_ZERO);
 
     var coord = getCell(e.clientX, e.clientY);
     var r = coord[0];
@@ -278,51 +377,15 @@ function handleClick(e) {
         selectedCell[0] = r;
         selectedCell[1] = c;
         prevRHover = prevCHover = null;
-        showValidMoves();
+        getValidMoves(PLAYER_ZERO);
+        showValidMoves(PLAYER_ZERO);
     }
-    else if (isValidMove(r, c)) {
-        if (playerGrid[r][c] == PLAYER_ONE) {
-            if(grid[r][c] == '💣') {
-                if (+grid[selectedCell[0]][selectedCell[1]] == 3) {
-                    drawCell(r, c, grid[selectedCell[0]][selectedCell[1]], PLAYER_COLOR);
-                    grid[r][c] = grid[selectedCell[0]][selectedCell[1]];
-                    playerGrid[r][c] = 0;
-                }
-                    drawCell(selectedCell[0], selectedCell[1], "", GRASS_COLOR);
-                    grid[selectedCell[0]][selectedCell[1]] = 0;
-                    playerGrid[selectedCell[0]][selectedCell[1]] = 2;
-            }
-            else if(grid[r][c] == '🚩') {
-                alert("You win!");
-            }
-            else {
-                if (+grid[r][c] < +grid[selectedCell[0]][selectedCell[1]] ||
-                    (+grid[r][c] == 10 && +grid[selectedCell[0]][selectedCell[1]] == 1)) {
-                    drawCell(r, c, grid[selectedCell[0]][selectedCell[1]], PLAYER_COLOR);
-                    grid[r][c] = grid[selectedCell[0]][selectedCell[1]];
-                    playerGrid[r][c] = 0;
-                }
-                else if (+grid[r][c] == +grid[selectedCell[0]][selectedCell[1]]) {
-                    drawCell(r, c, "", GRASS_COLOR);
-                    grid[r][c] = 0;
-                    playerGrid[r][c] = 2;
-                }
-                drawCell(selectedCell[0], selectedCell[1], "", GRASS_COLOR);
-                grid[selectedCell[0]][selectedCell[1]] = 0;
-                playerGrid[selectedCell[0]][selectedCell[1]] = 2;
-            }
-        }
-        else {
-            drawCell(r, c, grid[selectedCell[0]][selectedCell[1]], PLAYER_COLOR);
-            drawCell(selectedCell[0], selectedCell[1], "", GRASS_COLOR);
-            
-            grid[r][c] = grid[selectedCell[0]][selectedCell[1]];
-            grid[selectedCell[0]][selectedCell[1]] = 0;
-            playerGrid[r][c] = 0;
-            playerGrid[selectedCell[0]][selectedCell[1]] = 2;
-    
-        }
-        selectedCell[0] = selectedCell[1] = null;
+    else if (isValidMove(r, c, PLAYER_ZERO)) {
+        // var fromR = selectedCell[0];
+        // var fromC = selectedCell[1];
+        // var toR = r;
+        // var toC = c;
+        move(selectedCell[0], selectedCell[1], r, c, PLAYER_ZERO);
         opponentMove();
     }
     else {
